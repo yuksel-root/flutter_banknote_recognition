@@ -4,7 +4,7 @@ import 'package:image/image.dart' as img;
 
 void main() {
   group('prepareInput', () {
-    test('görüntüyü ortadan kırpar, yeniden boyutlandırır ve RGB üretir', () {
+    test('center crops, resizes, and produces RGB data', () {
       final source = img.Image(width: 300, height: 100);
       for (var y = 0; y < source.height; y++) {
         for (var x = 0; x < source.width; x++) {
@@ -24,7 +24,7 @@ void main() {
       expect(bytes.sublist(topRight, topRight + 3), [0, 0, 255]);
     });
 
-    test('geçersiz hedef boyutlarını reddeder', () {
+    test('rejects invalid target dimensions', () {
       final source = img.Image(width: 10, height: 10);
 
       expect(
@@ -39,7 +39,7 @@ void main() {
   });
 
   group('normalizeScores', () {
-    test('uint8 model çıktısını olasılıklara dönüştürür', () {
+    test('converts uint8 model output to probabilities', () {
       final probabilities = TfliteService.normalizeScores([
         20,
         209,
@@ -54,7 +54,7 @@ void main() {
       expect(probabilities[1], closeTo(209 / 256, 1e-9));
     });
 
-    test('zaten normalize edilmiş çıktıyı korur', () {
+    test('preserves already normalized output', () {
       final probabilities = TfliteService.normalizeScores([
         0.05,
         0.9,
@@ -68,7 +68,7 @@ void main() {
       expect(probabilities[1], closeTo(0.9, 1e-9));
     });
 
-    test('logit çıktısını softmax ile olasılıklara dönüştürür', () {
+    test('converts logit output to probabilities with softmax', () {
       final probabilities = TfliteService.normalizeScores([
         2.0,
         -1.0,
@@ -83,7 +83,7 @@ void main() {
       expect(probabilities[0], greaterThan(probabilities[1]));
     });
 
-    test('boş veya geçersiz çıktıyı reddeder', () {
+    test('rejects empty or invalid output', () {
       expect(() => TfliteService.normalizeScores([]), throwsFormatException);
       expect(
         () => TfliteService.normalizeScores([0, 0, 0]),

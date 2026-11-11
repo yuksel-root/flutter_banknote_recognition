@@ -41,7 +41,7 @@ void main() {
     return SharedPreferences.getInstance();
   }
 
-  test('güven eşiğinin altındaki sonucu reddeder', () async {
+  test('rejects a result below the confidence threshold', () async {
     final preferences = await createPreferences({
       BanknoteRepository.confidenceThresholdKey: 0.8,
     });
@@ -59,7 +59,7 @@ void main() {
   });
 
   test(
-    'eşiğe eşit sonucu kabul eder ve güvenlik özelliklerini eşler',
+    'accepts a result at the threshold and maps security features',
     () async {
       final preferences = await createPreferences({
         BanknoteRepository.confidenceThresholdKey: 0.8,
@@ -88,7 +88,7 @@ void main() {
     },
   );
 
-  test('varsayılan eşik değerini kullanır', () async {
+  test('uses the default threshold', () async {
     final preferences = await createPreferences({});
     final repository = BanknoteRepository(
       preferences: preferences,
@@ -104,7 +104,7 @@ void main() {
     expect(result, isNull);
   });
 
-  test('özellik bulunamazsa boş liste döndürür', () async {
+  test('returns an empty list when features are missing', () async {
     final preferences = await createPreferences({});
     final repository = BanknoteRepository(
       preferences: preferences,

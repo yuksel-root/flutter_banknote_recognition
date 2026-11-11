@@ -14,7 +14,7 @@ class _FakeBanknoteRepository extends BanknoteRepository {
 }
 
 void main() {
-  testWidgets('tarama ekranı temel yönlendirmeleri gösterir', (tester) async {
+  testWidgets('scanner screen shows the base guidance', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
     final cameraService = CameraService();

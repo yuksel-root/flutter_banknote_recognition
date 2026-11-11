@@ -31,7 +31,7 @@ void main() {
     securityFeatures: ['Test özelliği'],
   );
 
-  test('başarılı taramada işleniyor ve sonuç durumlarını yayınlar', () async {
+  test('emits processing and result states on a successful scan', () async {
     final bloc = ScannerBloc(
       repository: _FakeBanknoteRepository(preferences, result),
     );
@@ -49,7 +49,7 @@ void main() {
     await bloc.close();
   });
 
-  test('banknot okunamazsa hata durumu yayınlar', () async {
+  test('emits an error state when the banknote cannot be read', () async {
     final bloc = ScannerBloc(
       repository: _FakeBanknoteRepository(preferences, null),
     );
