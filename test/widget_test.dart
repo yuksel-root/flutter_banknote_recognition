@@ -6,14 +6,22 @@ import 'package:flutter_banknote_recognition/repository/banknote_repository.dart
 import 'package:flutter_banknote_recognition/services/camera_service.dart';
 import 'package:flutter_banknote_recognition/services/tts_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class _FakeBanknoteRepository extends BanknoteRepository {}
+class _FakeBanknoteRepository extends BanknoteRepository {
+  _FakeBanknoteRepository(SharedPreferences preferences)
+    : super(preferences: preferences);
+}
 
 void main() {
   testWidgets('tarama ekranı temel yönlendirmeleri gösterir', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
     final cameraService = CameraService();
     final ttsService = TtsService();
-    final scannerBloc = ScannerBloc(repository: _FakeBanknoteRepository());
+    final scannerBloc = ScannerBloc(
+      repository: _FakeBanknoteRepository(preferences),
+    );
 
     addTearDown(() async {
       await scannerBloc.close();

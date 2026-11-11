@@ -17,7 +17,7 @@ Future<void> main() async {
   final ttsService = TtsService();
   await ttsService.initialize();
   final cameraService = CameraService();
-  final banknoteRepository = BanknoteRepository();
+  final banknoteRepository = BanknoteRepository(preferences: preferences);
 
   runApp(
     MultiRepositoryProvider(
