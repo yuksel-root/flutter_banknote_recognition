@@ -54,7 +54,7 @@ class TtsService {
     try {
       await _tts.stop();
     } catch (_) {
-      // Sessizce yok sayılır; durdurma hatası taramayı engellememeli.
+      return;
     }
   }
 }
