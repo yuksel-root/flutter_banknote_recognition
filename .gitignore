@@ -1,25 +1,16 @@
-# İşletim sistemi
 .DS_Store
 Thumbs.db
-
-# Editörler
 .idea/
 *.iml
 .vscode/
-
-# Dart ve Flutter
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 build/
 coverage/
-
-# Yerel yapılandırma ve imza dosyaları
 .env
 android/local.properties
 android/key.properties
 *.jks
 *.keystore
-
-# Günlükler
 *.log
