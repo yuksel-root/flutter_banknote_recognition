@@ -1,30 +1,48 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_banknote_recognition/app.dart';
+import 'package:flutter_banknote_recognition/bloc/scanner_bloc.dart';
+import 'package:flutter_banknote_recognition/repository/banknote_repository.dart';
+import 'package:flutter_banknote_recognition/services/camera_service.dart';
+import 'package:flutter_banknote_recognition/services/tts_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:flutter_banknote_recognition/main.dart';
+class _FakeBanknoteRepository extends BanknoteRepository {}
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('tarama ekranı temel yönlendirmeleri gösterir', (tester) async {
+    final cameraService = CameraService();
+    final ttsService = TtsService();
+    final scannerBloc = ScannerBloc(repository: _FakeBanknoteRepository());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    addTearDown(() async {
+      await scannerBloc.close();
+      cameraService.dispose();
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+    await tester.pumpWidget(
+      MultiRepositoryProvider(
+        providers: [
+          RepositoryProvider<TtsService>.value(value: ttsService),
+          RepositoryProvider<CameraService>.value(value: cameraService),
+        ],
+        child: BlocProvider<ScannerBloc>.value(
+          value: scannerBloc,
+          child: const BanknoteApp(),
+        ),
+      ),
+    );
     await tester.pump();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Banknot Tanıma'), findsOneWidget);
+    expect(find.text('Banknotu hazırlayın'), findsOneWidget);
+    expect(find.text('Kamera başlatılıyor...'), findsOneWidget);
+    expect(find.text('Tara'), findsOneWidget);
+    expect(find.text('Türkçe seslendirme kullanılamıyor.'), findsOneWidget);
+
+    final scanButton = tester.widget<ElevatedButton>(
+      find.widgetWithText(ElevatedButton, 'Tara'),
+    );
+    expect(scanButton.onPressed, isNull);
   });
 }

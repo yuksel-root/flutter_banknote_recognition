@@ -1,12 +1,36 @@
 import 'dart:async';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
-class CameraService extends ChangeNotifier with WidgetsBindingObserver {
+class CameraServiceState {
+  const CameraServiceState({
+    this.controller,
+    this.isInitializing = false,
+    this.errorMessage,
+  });
+
+  final CameraController? controller;
+  final bool isInitializing;
+  final String? errorMessage;
+
+  bool get isReady => controller?.value.isInitialized ?? false;
+}
+
+class CameraService {
   CameraService() {
-    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addObserver(_lifecycleObserver);
   }
+
+  final ValueNotifier<CameraServiceState> _state = ValueNotifier(
+    const CameraServiceState(),
+  );
+
+  ValueListenable<CameraServiceState> get state => _state;
+
+  late final _CameraLifecycleObserver _lifecycleObserver =
+      _CameraLifecycleObserver(this);
 
   CameraController? _controller;
   Future<void>? _initialization;
@@ -39,7 +63,7 @@ class CameraService extends ChangeNotifier with WidgetsBindingObserver {
 
     _isInitializing = true;
     _errorMessage = null;
-    _notifyListeners();
+    _publish();
 
     CameraController? newController;
 
@@ -78,7 +102,7 @@ class CameraService extends ChangeNotifier with WidgetsBindingObserver {
         await newController.dispose();
       }
       _isInitializing = false;
-      _notifyListeners();
+      _publish();
     }
   }
 
@@ -86,7 +110,7 @@ class CameraService extends ChangeNotifier with WidgetsBindingObserver {
     final activeController = _controller;
     if (activeController == null || !activeController.value.isInitialized) {
       _errorMessage = 'Kamera hazır değil. Lütfen kamerayı yeniden başlatın.';
-      _notifyListeners();
+      _publish();
       return null;
     }
 
@@ -102,7 +126,7 @@ class CameraService extends ChangeNotifier with WidgetsBindingObserver {
       _errorMessage = 'Fotoğraf çekilemedi. Lütfen tekrar deneyin.';
     }
 
-    _notifyListeners();
+    _publish();
     return null;
   }
 
@@ -111,9 +135,8 @@ class CameraService extends ChangeNotifier with WidgetsBindingObserver {
     await initialize();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
+  void didChangeAppLifecycleState(AppLifecycleState lifecycleState) {
+    if (lifecycleState == AppLifecycleState.resumed) {
       if (_controller == null) {
         unawaited(initialize());
       }
@@ -125,7 +148,7 @@ class CameraService extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> _disposeCurrentController() async {
     final previousController = _controller;
     _controller = null;
-    _notifyListeners();
+    _publish();
 
     if (previousController != null) {
       await previousController.dispose();
@@ -143,21 +166,36 @@ class CameraService extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  void _notifyListeners() {
-    if (!_disposed) {
-      notifyListeners();
+  void _publish() {
+    if (_disposed) {
+      return;
     }
+
+    _state.value = CameraServiceState(
+      controller: _controller,
+      isInitializing: _isInitializing,
+      errorMessage: _errorMessage,
+    );
   }
 
-  @override
   void dispose() {
     _disposed = true;
-    WidgetsBinding.instance.removeObserver(this);
+    WidgetsBinding.instance.removeObserver(_lifecycleObserver);
     final activeController = _controller;
     _controller = null;
     if (activeController != null) {
       unawaited(activeController.dispose());
     }
-    super.dispose();
+  }
+}
+
+class _CameraLifecycleObserver with WidgetsBindingObserver {
+  _CameraLifecycleObserver(this._cameraService);
+
+  final CameraService _cameraService;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _cameraService.didChangeAppLifecycleState(state);
   }
 }
