@@ -480,8 +480,8 @@ class _ScanButton extends StatelessWidget {
     final ttsService = context.read<TtsService>();
     final scannerBloc = context.read<ScannerBloc>();
 
-    final image = await cameraService.takePicture();
-    if (image == null) {
+    final images = await cameraService.takePictureBurst();
+    if (images.isEmpty) {
       final message =
           cameraService.errorMessage ??
           'Fotoğraf çekilemedi. Lütfen kamerayı yeniden başlatın.';
@@ -489,6 +489,6 @@ class _ScanButton extends StatelessWidget {
       return;
     }
 
-    scannerBloc.add(ScanRequested(image));
+    scannerBloc.add(ScanRequested(images));
   }
 }

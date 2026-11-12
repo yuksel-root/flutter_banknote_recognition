@@ -5,9 +5,9 @@ sealed class ScannerEvent {
 }
 
 final class ScanRequested extends ScannerEvent {
-  const ScanRequested(this.image);
+  const ScanRequested(this.images);
 
-  final XFile image;
+  final List<XFile> images;
 }
 
 final class ScanReset extends ScannerEvent {

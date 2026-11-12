@@ -9,6 +9,8 @@ Uygulama, kameradaki banknotun kupür değerini cihaz üzerinde çalışan bir T
 - 5, 10, 20, 50, 100 ve 200 TL kupürlerini tanır.
 - Tamamen çevrimdışı çalışır; internet, Firebase veya veritabanı kullanmaz.
 - Kameradan alınan görüntüyü cihaz üzerinde işler ve sonucu Türkçe seslendirir.
+- Banknotu kameradaki çerçeveye göre kırparak arka planın sonucu etkilemesini azaltır.
+- Üç kare yakalar ve en az iki karenin aynı sonucu vermesini bekleyerek kararlı tanıma yapar.
 - Tanınan değerle birlikte güven oranını ve ilgili kupürün güvenlik özelliklerini okur.
 - Yüksek kontrastlı koyu arayüz, büyük düğmeler ve ekran okuyucu etiketleri sunar.
 - Banknotun gerçek veya sahte olduğuna karar vermez; yalnızca değer ve güvenlik özelliği rehberliği sunar.
@@ -17,16 +19,21 @@ Uygulama, kameradaki banknotun kupür değerini cihaz üzerinde çalışan bir T
 
 1. Uygulamayı açın ve kameranın hazır olmasını bekleyin.
 2. Banknotu kameranın önündeki çerçeveye yerleştirin.
-3. `Tara` düğmesine dokunun.
+3. `Tara` düğmesine dokunun. Uygulama üç kare yakalar.
 4. Uygulama değeri, güven oranını ve güvenlik özelliklerini sesli olarak bildirir.
-5. Gerektiğinde `Taramayı İptal Et` ile işlemi durdurabilirsiniz.
+5. Sonuç kararlı değilse uygulama banknotu sabit tutup tekrar denemenizi ister.
+6. Gerektiğinde `Taramayı İptal Et` ile işlemi durdurabilirsiniz.
 
 ## Model ve güvenlik rehberi
 
 - Model dosyası: `assets/model.tflite`
 - Giriş: 224 x 224 x 3 RGB görüntü
 - Sınıflar: `5 TL`, `10 TL`, `20 TL`, `50 TL`, `100 TL`, `200 TL`
-- Görüntü, model girişine verilmeden önce EXIF yönüne göre düzeltilir ve model giriş boyutuna yeniden boyutlandırılır.
+- Görüntü, model girişine verilmeden önce EXIF yönüne göre düzeltilir.
+- Kırpma, görüntü genişliğinin %95'i genişliğinde ve 2:1 oranında, dikeyde %45 merkezli bir bölgeyi alır; bu bölge model giriş boyutuna yeniden boyutlandırılır.
+- Her kare için hem tam görüntü hem de çerçeve kırpması ayrı ayrı değerlendirilir. İki sonuç aynı kupürü vermezse kare geçersiz sayılır.
+- Üç kare içinden en az iki kare aynı kupürde birleşmelidir; aksi halde uygulama sonucu reddeder.
+- Güven eşiği, kare birleştirmesinden sonra kalan sonuca uygulanır.
 - Model, 180 görüntülük bağımsız test kümesinde %96,1 doğruluk göstermiştir. `0.7` güven eşiğinde kabul edilen sonuçların %99,4'ü doğrudur.
 - Varsayılan güven eşiği `0.7` değerindedir. Eşik değeri `SharedPreferences` içindeki `confidence_threshold` anahtarından okunur.
 - Eşiğin altındaki sonuçlar kullanıcıya gösterilmez; uygulama banknotu tekrar denemesi için yönlendirme yapar.
@@ -36,6 +43,7 @@ Uygulama, kameradaki banknotun kupür değerini cihaz üzerinde çalışan bir T
 
 - Kamera önizlemesi, fotoğraf yakalama ve kamera hata yönetimi tamamlandı.
 - Gerçek TFLite modeliyle cihaz üzeri çıkarım tamamlandı.
+- Çerçeve kırpması, tam kare ile kırpma uzlaşması ve üç kareli kararlı tanıma tamamlandı.
 - Güven eşiği, sonuç eşleştirme ve güvenlik özelliği yükleme tamamlandı.
 - Türkçe metin okuma ve erişilebilir arayüz tamamlandı.
 - Durum yönetimi `flutter_bloc` ile, nesne yaşam döngüsü `StatefulWidget` kullanmadan uygulandı.
@@ -92,10 +100,12 @@ Tarama akışı:
 
 ```text
 Kamera görüntüsü
+  -> Üç kare yakalama
   -> ScanRequested
   -> ScannerProcessing
   -> BanknoteRepository
-  -> TfliteService
+  -> TfliteService (tam kare + çerçeve kırpması)
+  -> Kare çoğunluğu ve güven eşiği
   -> ScannerResult veya ScannerError
   -> Ekran ve Türkçe sesli geri bildirim
 ```
@@ -107,7 +117,7 @@ flutter analyze
 flutter test
 ```
 
-Testler; görüntü hazırlama, model çıktısı normalizasyonu, güven eşiği, güvenlik özelliği eşleştirmesi, durum yönetimi ve temel arayüz davranışlarını kapsar.
+Testler; görüntü hazırlama, çerçeve kırpması, tam kare ile kırpma uzlaşması, model çıktısı normalizasyonu, güven eşiği, kare çoğunluğu, güvenlik özelliği eşleştirmesi, durum yönetimi ve temel arayüz davranışlarını kapsar.
 
 ## Gizlilik ve sınırlar
 

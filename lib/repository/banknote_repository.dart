@@ -26,10 +26,13 @@ class BanknoteRepository {
 
   Future<Map<String, List<String>>>? _securityFeatures;
 
-  Future<BanknoteResult?> recognize(XFile image) async {
+  Future<BanknoteResult?> recognize(
+    XFile image, {
+    bool applyThreshold = true,
+  }) async {
     final prediction = await _tfliteService.predict(image);
 
-    if (prediction.confidence < _confidenceThreshold) {
+    if (applyThreshold && prediction.confidence < _confidenceThreshold) {
       return null;
     }
 
@@ -42,6 +45,8 @@ class BanknoteRepository {
       securityFeatures: List<String>.unmodifiable(features),
     );
   }
+
+  double get confidenceThreshold => _confidenceThreshold;
 
   double get _confidenceThreshold {
     final stored = _preferences.get(confidenceThresholdKey);

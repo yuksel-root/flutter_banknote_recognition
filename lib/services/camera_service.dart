@@ -130,6 +130,29 @@ class CameraService {
     return null;
   }
 
+  Future<List<XFile>> takePictureBurst({
+    int count = 3,
+    Duration interval = const Duration(milliseconds: 250),
+  }) async {
+    if (count <= 0) {
+      return const <XFile>[];
+    }
+
+    final images = <XFile>[];
+
+    for (var index = 0; index < count; index++) {
+      final image = await takePicture();
+      if (image != null) {
+        images.add(image);
+      }
+      if (index < count - 1) {
+        await Future<void>.delayed(interval);
+      }
+    }
+
+    return images;
+  }
+
   Future<void> retry() async {
     await _disposeCurrentController();
     await initialize();
