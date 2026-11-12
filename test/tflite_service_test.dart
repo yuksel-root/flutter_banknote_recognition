@@ -99,7 +99,12 @@ void main() {
         ],
       );
 
-      final bytes = TfliteService.frameToInput(frame, width: 2, height: 2);
+      final bytes = TfliteService.frameToInput(
+        frame,
+        width: 2,
+        height: 2,
+        cropToNote: false,
+      );
 
       expect(bytes, [255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0]);
     });
@@ -140,7 +145,12 @@ void main() {
         ],
       );
 
-      final bytes = TfliteService.frameToInput(frame, width: 2, height: 2);
+      final bytes = TfliteService.frameToInput(
+        frame,
+        width: 2,
+        height: 2,
+        cropToNote: false,
+      );
 
       expect(bytes, [0, 0, 255, 255, 0, 0, 255, 255, 255, 0, 255, 0]);
     });
@@ -177,9 +187,126 @@ void main() {
         ],
       );
 
-      final bytes = TfliteService.frameToInput(frame, width: 2, height: 2);
+      final bytes = TfliteService.frameToInput(
+        frame,
+        width: 2,
+        height: 2,
+        cropToNote: false,
+      );
 
       expect(bytes, [0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255]);
+    });
+
+    test('crops the centered note band before inference', () {
+      final bytes = Uint8List(4 * 16 * 4);
+      for (var y = 0; y < 16; y++) {
+        final green = y >= 8 && y < 10;
+        for (var x = 0; x < 4; x++) {
+          final index = (y * 4 + x) * 4;
+          bytes[index] = 0;
+          bytes[index + 1] = green ? 255 : 0;
+          bytes[index + 2] = green ? 0 : 255;
+          bytes[index + 3] = 255;
+        }
+      }
+
+      final frame = VideoFrame(
+        width: 4,
+        height: 16,
+        format: FrameFormat.bgra8888,
+        rotationDegrees: 0,
+        planes: [FramePlane(bytes: bytes, bytesPerRow: 16, pixelStride: 4)],
+      );
+
+      final output = TfliteService.frameToInput(frame, width: 2, height: 2);
+
+      expect(output, [0, 255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0]);
+    });
+
+    test('brightens dark frames before inference', () {
+      final frame = VideoFrame(
+        width: 2,
+        height: 2,
+        format: FrameFormat.bgra8888,
+        rotationDegrees: 0,
+        planes: [
+          FramePlane(
+            bytes: Uint8List.fromList([
+              10,
+              10,
+              10,
+              255,
+              10,
+              10,
+              10,
+              255,
+              10,
+              10,
+              10,
+              255,
+              10,
+              10,
+              10,
+              255,
+            ]),
+            bytesPerRow: 8,
+            pixelStride: 4,
+          ),
+        ],
+      );
+
+      final bytes = TfliteService.frameToInput(
+        frame,
+        width: 2,
+        height: 2,
+        cropToNote: false,
+      );
+
+      expect(bytes.first, inInclusiveRange(55, 65));
+      expect(bytes[1], bytes.first);
+      expect(bytes[2], bytes.first);
+    });
+
+    test('keeps bright frames unchanged', () {
+      final frame = VideoFrame(
+        width: 2,
+        height: 2,
+        format: FrameFormat.bgra8888,
+        rotationDegrees: 0,
+        planes: [
+          FramePlane(
+            bytes: Uint8List.fromList([
+              200,
+              200,
+              200,
+              255,
+              200,
+              200,
+              200,
+              255,
+              200,
+              200,
+              200,
+              255,
+              200,
+              200,
+              200,
+              255,
+            ]),
+            bytesPerRow: 8,
+            pixelStride: 4,
+          ),
+        ],
+      );
+
+      final bytes = TfliteService.frameToInput(
+        frame,
+        width: 2,
+        height: 2,
+        cropToNote: false,
+      );
+
+      expect(bytes, List<int>.filled(12, 200));
     });
 
     test('rejects invalid frames and target sizes', () {

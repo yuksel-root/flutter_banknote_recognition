@@ -80,6 +80,7 @@ class TfliteService {
     VideoFrame frame, {
     required int width,
     required int height,
+    bool cropToNote = true,
   }) {
     if (width <= 0 || height <= 0 || width != height) {
       throw ArgumentError('Model input dimensions must be equal and positive.');
@@ -100,6 +101,21 @@ class TfliteService {
         ? frame.width
         : frame.height;
 
+    final cropWidth = rotatedWidth;
+    final cropHeight = cropToNote
+        ? math.max(1, math.min(rotatedHeight, (cropWidth * 9 / 16).round()))
+        : rotatedHeight;
+    final cropLeft = 0;
+    final cropTop = cropToNote
+        ? math.max(
+            0,
+            math.min(
+              rotatedHeight - cropHeight,
+              (rotatedHeight * 0.55).round() - cropHeight ~/ 2,
+            ),
+          )
+        : 0;
+
     final yPlane = frame.planes.first;
     final isBgra = frame.format == FrameFormat.bgra8888;
     final interleavedUv =
@@ -118,10 +134,10 @@ class TfliteService {
     var outputIndex = 0;
 
     for (var outputY = 0; outputY < height; outputY++) {
-      final dy = (outputY * rotatedHeight) ~/ height;
+      final dy = cropTop + (outputY * cropHeight) ~/ height;
 
       for (var outputX = 0; outputX < width; outputX++) {
-        final dx = (outputX * rotatedWidth) ~/ width;
+        final dx = cropLeft + (outputX * cropWidth) ~/ width;
 
         final int sourceX;
         final int sourceY;
@@ -193,7 +209,37 @@ class TfliteService {
       }
     }
 
+    _applyLowLightCorrection(output);
     return output;
+  }
+
+  static void _applyLowLightCorrection(Uint8List pixels) {
+    var totalBrightness = 0;
+    for (var index = 0; index < pixels.length; index += 3) {
+      totalBrightness +=
+          (pixels[index] * 0.299 +
+                  pixels[index + 1] * 0.587 +
+                  pixels[index + 2] * 0.114)
+              .round();
+    }
+
+    final averageBrightness = totalBrightness / (pixels.length ~/ 3);
+    if (averageBrightness >= 90) {
+      return;
+    }
+
+    const gamma = 0.45;
+    final lut = Uint8List(256);
+    for (var index = 0; index < 256; index++) {
+      lut[index] = (math.pow(index / 255.0, gamma) * 255)
+          .round()
+          .clamp(0, 255)
+          .toInt();
+    }
+
+    for (var index = 0; index < pixels.length; index++) {
+      pixels[index] = lut[pixels[index]];
+    }
   }
 
   Future<Interpreter> _ensureInterpreter() {

@@ -8,12 +8,12 @@ Uygulama, kameradaki banknotun kupür değerini cihaz üzerinde çalışan bir T
 
 - 5, 10, 20, 50, 100 ve 200 TL kupürlerini tanır.
 - Tamamen çevrimdışı çalışır; internet, Firebase veya veritabanı kullanmaz.
-- Kameradan gelen tam kareyi saniyede 5 kez analiz eder.
+- Kameradan gelen kareleri saniyede 5 kez, ortadaki banknot bandı üzerinden analiz eder.
 - En olası beş kupürü ve yüzdelerini gerçek zamanlı gösterir.
 - Her kare için analiz süresini gösterir.
 - Aynı kupür üç kare üst üste güven eşiğini geçtiğinde sonucu kabul eder.
 - Sonucu yalnızca kupür değeri olarak Türkçe seslendirir.
-- Tanıma çerçevesi kullanmaz; banknotun tamamı kamerada görünmelidir.
+- Görünür tanıma çerçevesi kullanmaz; banknot kameranın orta bölgesinde görünmelidir.
 - Yüksek kontrastlı koyu arayüz, büyük düğmeler ve ekran okuyucu etiketleri sunar.
 - Banknotun gerçek veya sahte olduğuna karar vermez.
 
@@ -31,8 +31,8 @@ Uygulama, kameradaki banknotun kupür değerini cihaz üzerinde çalışan bir T
 - Model dosyası: `assets/model.tflite`
 - Giriş: 224 x 224 x 3 RGB görüntü
 - Sınıflar: `5 TL`, `10 TL`, `20 TL`, `50 TL`, `100 TL`, `200 TL`
-- Kamera kareleri cihaz yönüne göre döndürülür, YUV420 veya BGRA biçiminden RGB'ye çevrilir ve modele yeniden boyutlandırılarak verilir.
-- Tanıma çerçevesi veya kırpma yoktur; model tam kamera karesini değerlendirir.
+- Kamera kareleri cihaz yönüne göre döndürülür, YUV420 veya BGRA biçiminden RGB'ye çevrilir, düşük ışıkta gama düzeltmesi uygulanır ve modele yeniden boyutlandırılarak verilir.
+- Görünür bir tanıma çerçevesi yoktur. Model, kameranın orta bölgesindeki 16:9 banknot bandını değerlendirir; arka plan modele doğrudan verilmez.
 - Her karede en yüksek olasılıklı beş sınıf sıralanır ve yüzdeleri arayüzde gösterilir.
 - Aynı sınıf üç ardışık karede güven eşiğini geçmelidir. Etiket değişirse veya güven eşiğin altına düşerse kare sayacı sıfırlanır.
 - Varsayılan güven eşiği `0.7` değerindedir. Eşik değeri `SharedPreferences` içindeki `confidence_threshold` anahtarından okunur.
@@ -43,7 +43,8 @@ Uygulama, kameradaki banknotun kupür değerini cihaz üzerinde çalışan bir T
 
 - Kamera önizlemesi, canlı görüntü akışı ve kamera hata yönetimi tamamlandı.
 - Gerçek TFLite modeliyle cihaz üzeri çıkarım tamamlandı.
-- Tam kare analizi, saniyede 5 kare sabitlemesi ve gerçek zamanlı ilk beş tahmin tamamlandı.
+- Orta banknot bandı analizi, saniyede 5 kare sabitlemesi ve gerçek zamanlı ilk beş tahmin tamamlandı.
+- Loş ışık için gama düzeltmesi tamamlandı.
 - Üç kareli kararlı tanıma ve güven eşiği tamamlandı.
 - Yalnızca kupür değerini söyleyen Türkçe seslendirme tamamlandı.
 - Durum yönetimi `flutter_bloc` ile, nesne yaşam döngüsü `StatefulWidget` kullanmadan uygulandı.
@@ -106,7 +107,7 @@ Kamera görüntü akışı
   -> VideoFrame
   -> ScannerBloc
   -> BanknoteRepository
-  -> TfliteService (tam kare, ilk beş tahmin)
+  -> TfliteService (orta banknot bandı, düşük ışık düzeltmesi, ilk beş tahmin)
   -> StableFrameTracker (üç kare, güven eşiği)
   -> ScannerResult veya ScannerError
   -> Ekran ve yalnızca kupür değerinin Türkçe seslendirilmesi
@@ -119,7 +120,7 @@ flutter analyze
 flutter test
 ```
 
-Testler; model çıktısı normalizasyonu, ilk beş tahmin sıralaması, YUV420/BGRA dönüşümü, kare döndürme, kararlı kare takibi, güven eşiği, güvenlik özelliği eşleştirmesi, durum yönetimi ve temel arayüz davranışlarını kapsar.
+Testler; model çıktısı normalizasyonu, ilk beş tahmin sıralaması, YUV420/BGRA dönüşümü, kare döndürme, orta banknot bandı kırpması, karanlık kare parlaklık düzeltmesi, kararlı kare takibi, güven eşiği, güvenlik özelliği eşleştirmesi, durum yönetimi ve temel arayüz davranışlarını kapsar.
 
 ## Gizlilik ve sınırlar
 
