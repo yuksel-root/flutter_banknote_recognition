@@ -4,12 +4,15 @@ import 'package:image/image.dart' as img;
 
 void main() {
   group('prepareInput', () {
-    test('center crops, resizes, and produces RGB data', () {
-      final source = img.Image(width: 300, height: 100);
+    test('resizes the full image and produces RGB data', () {
+      final source = img.Image(width: 100, height: 300);
       for (var y = 0; y < source.height; y++) {
+        final segment = y ~/ 100;
+        final red = segment == 0 ? 255 : 0;
+        final green = segment == 1 ? 255 : 0;
+        final blue = segment == 2 ? 255 : 0;
         for (var x = 0; x < source.width; x++) {
-          final isLeft = x < source.width / 2;
-          source.setPixelRgb(x, y, isLeft ? 255 : 0, 0, isLeft ? 0 : 255);
+          source.setPixelRgb(x, y, red, green, blue);
         }
       }
 
@@ -17,11 +20,14 @@ void main() {
 
       expect(bytes.length, 224 * 224 * 3);
 
-      final topLeft = (112 * 224) * 3;
-      expect(bytes.sublist(topLeft, topLeft + 3), [255, 0, 0]);
+      final top = 112 * 3;
+      expect(bytes.sublist(top, top + 3), [255, 0, 0]);
 
-      final topRight = (112 * 224 + 223) * 3;
-      expect(bytes.sublist(topRight, topRight + 3), [0, 0, 255]);
+      final middle = (112 * 224 + 112) * 3;
+      expect(bytes.sublist(middle, middle + 3), [0, 255, 0]);
+
+      final bottom = (223 * 224 + 112) * 3;
+      expect(bytes.sublist(bottom, bottom + 3), [0, 0, 255]);
     });
 
     test('rejects invalid target dimensions', () {

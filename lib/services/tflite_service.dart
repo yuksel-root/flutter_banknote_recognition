@@ -179,10 +179,11 @@ class TfliteService {
     }
 
     final oriented = img.bakeOrientation(source);
-    final resized = img.copyResizeCropSquare(
+    final resized = img.copyResize(
       oriented,
-      size: width,
-      interpolation: img.Interpolation.linear,
+      width: width,
+      height: height,
+      interpolation: img.Interpolation.average,
     );
 
     return resized.getBytes(order: img.ChannelOrder.rgb);
