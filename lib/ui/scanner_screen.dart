@@ -32,7 +32,7 @@ class ScannerScreen extends StatelessWidget {
                 if (isLandscape) {
                   return const Row(
                     children: [
-                      Expanded(flex: 3, child: ScannerCameraPreview()),
+                      Expanded(flex: 4, child: ScannerCameraPreview()),
                       Expanded(flex: 2, child: _ControlsPanel()),
                     ],
                   );
@@ -40,8 +40,8 @@ class ScannerScreen extends StatelessWidget {
 
                 return const Column(
                   children: [
-                    Expanded(flex: 4, child: ScannerCameraPreview()),
-                    Expanded(flex: 5, child: _ControlsPanel()),
+                    Expanded(flex: 6, child: ScannerCameraPreview()),
+                    Expanded(flex: 4, child: _ControlsPanel()),
                   ],
                 );
               },
@@ -123,7 +123,7 @@ class _ControlsPanel extends StatelessWidget {
     return ColoredBox(
       color: theme.colorScheme.surface,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -133,7 +133,7 @@ class _ControlsPanel extends StatelessWidget {
                     ttsService.errorMessage ??
                     'Türkçe seslendirme kullanılamıyor.',
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
             ],
             Expanded(
               child: SingleChildScrollView(
@@ -142,7 +142,7 @@ class _ControlsPanel extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             const _ScanActionButton(),
           ],
         ),
@@ -218,17 +218,17 @@ class _IdleStatus extends StatelessWidget {
           icon: Icons.center_focus_strong,
           title: 'Banknotu kameraya gösterin',
         ),
-        SizedBox(height: 12),
+        SizedBox(height: 8),
         Text(
           'Tarama otomatik olarak başlar. Uygulama çevrimdışı çalışır, '
           'banknot değerini canlı olarak analiz eder ve sonucu sesli söyler.',
-          style: TextStyle(fontSize: 19, height: 1.5),
+          style: TextStyle(fontSize: 16, height: 1.4),
         ),
-        SizedBox(height: 16),
+        SizedBox(height: 10),
         Text(
           'Uygulama banknotun gerçek veya sahte olduğuna karar vermez. '
           'Yalnızca değer tahmini yapar.',
-          style: TextStyle(fontSize: 16, color: Color(0xFFBDBDBD), height: 1.4),
+          style: TextStyle(fontSize: 14, color: Color(0xFFBDBDBD), height: 1.4),
         ),
       ],
     );
@@ -251,12 +251,12 @@ class _ScanningStatus extends StatelessWidget {
           title: 'Canlı analiz',
           trailing: _FpsBadge(),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
         if (ranked.isEmpty)
           const _WaitingForFrame()
         else
           _PredictionList(ranked: ranked),
-        const SizedBox(height: 10),
+        const SizedBox(height: 4),
         _ElapsedRow(elapsed: elapsed),
       ],
     );
@@ -315,36 +315,36 @@ class _PredictionRow extends StatelessWidget {
     final percentage = (prediction.confidence * 100).toStringAsFixed(2);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      margin: const EdgeInsets.only(bottom: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
       decoration: BoxDecoration(
         color: const Color(0xFF263238),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           SizedBox(
-            width: 26,
+            width: 24,
             child: Text(
               '$rank:',
               style: TextStyle(
-                fontSize: 17,
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.primary,
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               prediction.value,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
           Text(
             '(%$percentage)',
             style: const TextStyle(
-              fontSize: 17,
+              fontSize: 15,
               fontWeight: FontWeight.w600,
               color: Color(0xFFB0BEC5),
             ),
@@ -369,13 +369,13 @@ class _ElapsedRow extends StatelessWidget {
         const Expanded(
           child: Text(
             'Geçen süre',
-            style: TextStyle(fontSize: 16, color: Color(0xFFBDBDBD)),
+            style: TextStyle(fontSize: 14, color: Color(0xFFBDBDBD)),
           ),
         ),
         Text(
           '$seconds s',
           style: const TextStyle(
-            fontSize: 16,
+            fontSize: 14,
             fontWeight: FontWeight.w600,
             color: Color(0xFFB0BEC5),
           ),
@@ -402,12 +402,12 @@ class _ResultStatus extends StatelessWidget {
           icon: Icons.check_circle_outline,
           title: 'Banknot tanındı',
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Text(
           result.value,
           textAlign: TextAlign.center,
           style: TextStyle(
-            fontSize: 58,
+            fontSize: 46,
             fontWeight: FontWeight.bold,
             color: theme.colorScheme.primary,
           ),
@@ -415,12 +415,12 @@ class _ResultStatus extends StatelessWidget {
         Text(
           'Güven oranı: %$confidence',
           textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
-        const SizedBox(height: 18),
+        const SizedBox(height: 10),
         const Text(
           'Bu uygulama banknotun gerçek veya sahte olduğuna karar vermez.',
-          style: TextStyle(fontSize: 15, color: Color(0xFFBDBDBD), height: 1.4),
+          style: TextStyle(fontSize: 13, color: Color(0xFFBDBDBD), height: 1.4),
         ),
       ],
     );
@@ -444,13 +444,13 @@ class _ErrorStatus extends StatelessWidget {
           title: 'Tarama tamamlanamadı',
           color: colorScheme.error,
         ),
-        const SizedBox(height: 12),
-        Text(message, style: const TextStyle(fontSize: 19, height: 1.5)),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
+        Text(message, style: const TextStyle(fontSize: 16, height: 1.4)),
+        const SizedBox(height: 8),
         const Text(
           'Banknotu kameraya sabit tutup ışığın yeterli olduğundan emin olun '
           've yeniden deneyin.',
-          style: TextStyle(fontSize: 17, color: Color(0xFFBDBDBD), height: 1.4),
+          style: TextStyle(fontSize: 14, color: Color(0xFFBDBDBD), height: 1.4),
         ),
       ],
     );
@@ -476,15 +476,15 @@ class _StatusHeading extends StatelessWidget {
       children: [
         Icon(
           icon,
-          size: 28,
+          size: 24,
           color: color ?? Theme.of(context).colorScheme.primary,
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             title,
             style: TextStyle(
-              fontSize: 22,
+              fontSize: 19,
               fontWeight: FontWeight.bold,
               color: color,
             ),
@@ -502,7 +502,7 @@ class _FpsBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: const Color(0xFF1B5E20),
         borderRadius: BorderRadius.circular(20),
@@ -510,12 +510,12 @@ class _FpsBadge extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.bolt, size: 16, color: Color(0xFFA5D6A7)),
-          SizedBox(width: 4),
+          Icon(Icons.bolt, size: 14, color: Color(0xFFA5D6A7)),
+          SizedBox(width: 3),
           Text(
             '5 FPS',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: FontWeight.bold,
               color: Color(0xFFA5D6A7),
             ),
@@ -548,6 +548,17 @@ class _ScanActionButton extends StatelessWidget {
             }
 
             return ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(58),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 21,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               onPressed: !cameraReady
                   ? null
                   : () {
@@ -560,8 +571,8 @@ class _ScanActionButton extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(isRetry ? Icons.refresh : Icons.play_arrow, size: 30),
-                  const SizedBox(width: 10),
+                  Icon(isRetry ? Icons.refresh : Icons.play_arrow, size: 24),
+                  const SizedBox(width: 8),
                   Flexible(child: Text(label, textAlign: TextAlign.center)),
                 ],
               ),
