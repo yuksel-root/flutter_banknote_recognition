@@ -26,7 +26,8 @@ Uygulama, kameradaki banknotun kupür değerini cihaz üzerinde çalışan bir T
 - Model dosyası: `assets/model.tflite`
 - Giriş: 224 x 224 x 3 RGB görüntü
 - Sınıflar: `5 TL`, `10 TL`, `20 TL`, `50 TL`, `100 TL`, `200 TL`
-- Görüntü, model girişine verilmeden önce EXIF yönüne göre düzeltilir, ortadan kare olarak kırpılır ve yeniden boyutlandırılır.
+- Görüntü, model girişine verilmeden önce EXIF yönüne göre düzeltilir ve model giriş boyutuna yeniden boyutlandırılır.
+- Model, 180 görüntülük bağımsız test kümesinde %96,1 doğruluk göstermiştir. `0.7` güven eşiğinde kabul edilen sonuçların %99,4'ü doğrudur.
 - Varsayılan güven eşiği `0.7` değerindedir. Eşik değeri `SharedPreferences` içindeki `confidence_threshold` anahtarından okunur.
 - Eşiğin altındaki sonuçlar kullanıcıya gösterilmez; uygulama banknotu tekrar denemesi için yönlendirme yapar.
 - Güvenlik özelliği metinleri `assets/security_features.json` dosyasında kupür değerine göre saklanır.
