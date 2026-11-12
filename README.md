@@ -4,6 +4,12 @@
 
 Uygulama, kameradaki banknotun kupür değerini cihaz üzerinde çalışan bir TFLite modeliyle tanır. Canlı analiz sırasında en olası beş kupürü yüzdeleriyle gösterir ve kararlı sonuç oluştuğunda yalnızca banknot değerini Türkçe seslendirir.
 
+## Demo
+
+![Banknot tanıma demosu](docs/demo.gif)
+
+Masa üzerindeki 5 TL, 50 TL ve 100 TL banknotlar sırayla canlı analizde tanınır. Demo, banknotların yalnızca masa yüzeyiyle birlikte göründüğü bir sahnede kaydedilmiştir.
+
 ## Özellikler
 
 - 5, 10, 20, 50, 100 ve 200 TL kupürlerini tanır.
