@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'ui/app_colors.dart';
 import 'ui/scanner_screen.dart';
 
 class BanknoteApp extends StatelessWidget {
@@ -8,14 +9,19 @@ class BanknoteApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const colorScheme = ColorScheme.dark(
-      primary: Color(0xFFFFD54F),
-      onPrimary: Colors.black,
-      secondary: Color(0xFF80CBC4),
-      onSecondary: Colors.black,
-      error: Color(0xFFFF8A80),
-      onError: Colors.black,
-      surface: Color(0xFF121212),
-      onSurface: Colors.white,
+      primary: AppColors.primary,
+      onPrimary: AppColors.onPrimary,
+      primaryContainer: Color(0xFF3A2E0C),
+      onPrimaryContainer: AppColors.primary,
+      secondary: AppColors.secondary,
+      onSecondary: Color(0xFF00201C),
+      secondaryContainer: Color(0xFF12332F),
+      onSecondaryContainer: AppColors.secondary,
+      error: AppColors.error,
+      onError: Color(0xFF2B0000),
+      surface: AppColors.backgroundRaised,
+      onSurface: AppColors.textPrimary,
+      outline: AppColors.borderStrong,
     );
 
     return MaterialApp(
@@ -23,33 +29,58 @@ class BanknoteApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
+        brightness: Brightness.dark,
         colorScheme: colorScheme,
-        scaffoldBackgroundColor: Colors.black,
+        scaffoldBackgroundColor: AppColors.background,
+        canvasColor: AppColors.background,
+        splashFactory: InkSparkle.splashFactory,
+        textTheme: const TextTheme(
+          bodyLarge: TextStyle(color: AppColors.textPrimary),
+          bodyMedium: TextStyle(color: AppColors.textPrimary),
+          bodySmall: TextStyle(color: AppColors.textMuted),
+        ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.black,
-          foregroundColor: Colors.white,
-          centerTitle: false,
-          titleTextStyle: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
+          backgroundColor: Colors.transparent,
+          foregroundColor: AppColors.textPrimary,
+          elevation: 0,
+          scrolledUnderElevation: 0,
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            minimumSize: const Size.fromHeight(72),
-            backgroundColor: colorScheme.primary,
-            foregroundColor: colorScheme.onPrimary,
-            disabledBackgroundColor: const Color(0xFF424242),
-            disabledForegroundColor: const Color(0xFFBDBDBD),
+            elevation: 0,
+            minimumSize: const Size.fromHeight(56),
+            backgroundColor: AppColors.primary,
+            foregroundColor: AppColors.onPrimary,
+            disabledBackgroundColor: const Color(0xFF26313C),
+            disabledForegroundColor: AppColors.textFaint,
             textStyle: const TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.bold,
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
             ),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
             ),
           ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            textStyle: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+        progressIndicatorTheme: const ProgressIndicatorThemeData(
+          color: AppColors.primary,
+          linearTrackColor: AppColors.border,
+        ),
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: AppColors.panelRaised,
+          contentTextStyle: TextStyle(color: AppColors.textPrimary),
+          behavior: SnackBarBehavior.floating,
         ),
       ),
       home: const ScannerScreen(),
