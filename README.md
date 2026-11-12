@@ -1,6 +1,6 @@
 # Banknot Tanıma
 
-Görme engelli kullanıcılar için çevrimdışı Türk lirası banknot tanıma ve güvenlik özelliği rehberi.
+Çevrimdışı Türk lirası banknot tanıma ve güvenlik özelliği rehberi.
 
 Uygulama, kameradaki banknotun kupür değerini cihaz üzerinde çalışan bir TFLite modeliyle tanır ve sonucu Türkçe seslendirir. Ardından ilgili kupürün güvenlik özelliklerini adım adım anlatır.
 
