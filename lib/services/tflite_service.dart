@@ -1,15 +1,24 @@
 import 'dart:math' as math;
 import 'dart:typed_data';
 
-import 'package:camera/camera.dart';
-import 'package:image/image.dart' as img;
 import 'package:tflite_flutter/tflite_flutter.dart';
 
-class TflitePrediction {
-  const TflitePrediction({required this.value, required this.confidence});
+import '../models/video_frame.dart';
+
+class RankedPrediction {
+  const RankedPrediction({required this.value, required this.confidence});
 
   final String value;
   final double confidence;
+}
+
+class LivePrediction {
+  const LivePrediction({required this.ranked, required this.elapsed});
+
+  final List<RankedPrediction> ranked;
+  final Duration elapsed;
+
+  RankedPrediction get best => ranked.first;
 }
 
 class TfliteService {
@@ -22,8 +31,7 @@ class TfliteService {
     '100 TL',
     '200 TL',
   ];
-  static const double guideWidthFactor = 0.95;
-  static const double guideCenterYFactor = 0.45;
+  static const int topPredictionCount = 5;
 
   Interpreter? _interpreter;
   Future<Interpreter>? _loadingInterpreter;
@@ -34,70 +42,165 @@ class TfliteService {
   TensorType? _outputType;
   int _classCount = 0;
 
-  Future<TflitePrediction> predict(XFile image) async {
+  Future<LivePrediction> predictFrame(VideoFrame frame) async {
     if (_disposed) {
       throw StateError('Model service has already been disposed.');
     }
 
     final interpreter = await _ensureInterpreter();
-    final encodedImage = await image.readAsBytes();
-    final decodedImage = img.decodeImage(encodedImage);
-
-    if (decodedImage == null) {
-      throw const FormatException('The captured image could not be decoded.');
-    }
-
-    final fullFrameBytes = prepareInput(
-      decodedImage,
-      width: _inputWidth,
-      height: _inputHeight,
-      cropToGuide: false,
-    );
-    final guideBytes = prepareInput(
-      decodedImage,
+    final stopwatch = Stopwatch()..start();
+    final rgbBytes = frameToInput(
+      frame,
       width: _inputWidth,
       height: _inputHeight,
     );
+    final probabilities = normalizeScores(_runInference(interpreter, rgbBytes));
+    stopwatch.stop();
 
-    final fullFramePrediction = _predictionFromScores(
-      normalizeScores(_runInference(interpreter, fullFrameBytes)),
+    return LivePrediction(
+      ranked: rankedPredictions(probabilities),
+      elapsed: stopwatch.elapsed,
     );
-    final guidePrediction = _predictionFromScores(
-      normalizeScores(_runInference(interpreter, guideBytes)),
-    );
-
-    return combinePredictions(fullFramePrediction, guidePrediction);
   }
 
-  static TflitePrediction combinePredictions(
-    TflitePrediction fullFrame,
-    TflitePrediction guideCrop,
-  ) {
-    if (fullFrame.value != guideCrop.value) {
-      return TflitePrediction(value: fullFrame.value, confidence: 0);
+  static List<RankedPrediction> rankedPredictions(List<double> probabilities) {
+    if (probabilities.length != labels.length) {
+      throw ArgumentError('The model returned an unexpected score count.');
     }
 
-    return TflitePrediction(
-      value: fullFrame.value,
-      confidence: math.max(fullFrame.confidence, guideCrop.confidence),
+    final indices = List<int>.generate(probabilities.length, (index) => index)
+      ..sort((a, b) => probabilities[b].compareTo(probabilities[a]));
+
+    return List<RankedPrediction>.unmodifiable(
+      indices
+          .take(topPredictionCount)
+          .map(
+            (index) => RankedPrediction(
+              value: labels[index],
+              confidence: probabilities[index].clamp(0.0, 1.0),
+            ),
+          ),
     );
   }
 
-  static TflitePrediction _predictionFromScores(List<double> probabilities) {
-    var bestIndex = 0;
-    var bestProbability = probabilities.first;
+  static Uint8List frameToInput(
+    VideoFrame frame, {
+    required int width,
+    required int height,
+  }) {
+    if (width <= 0 || height <= 0 || width != height) {
+      throw ArgumentError('Model input dimensions must be equal and positive.');
+    }
+    if (frame.width <= 0 || frame.height <= 0 || frame.planes.isEmpty) {
+      throw ArgumentError('Frame dimensions and planes must be valid.');
+    }
 
-    for (var index = 1; index < probabilities.length; index++) {
-      if (probabilities[index] > bestProbability) {
-        bestIndex = index;
-        bestProbability = probabilities[index];
+    final rotation = ((frame.rotationDegrees % 360) + 360) % 360;
+    if (rotation % 90 != 0) {
+      throw ArgumentError('Frame rotation must be a multiple of 90 degrees.');
+    }
+
+    final rotatedWidth = rotation == 90 || rotation == 270
+        ? frame.height
+        : frame.width;
+    final rotatedHeight = rotation == 90 || rotation == 270
+        ? frame.width
+        : frame.height;
+
+    final yPlane = frame.planes.first;
+    final isBgra = frame.format == FrameFormat.bgra8888;
+    final interleavedUv =
+        frame.format == FrameFormat.yuv420 && frame.planes.length == 2;
+    final uPlane = isBgra || frame.planes.length < 2 ? null : frame.planes[1];
+    final vPlane = isBgra || frame.planes.length < 3 ? null : frame.planes[2];
+
+    if (frame.format == FrameFormat.yuv420 && frame.planes.length == 1) {
+      throw const FormatException('YUV frame must have at least two planes.');
+    }
+    if (isBgra && frame.planes.length != 1) {
+      throw const FormatException('BGRA frame must have one plane.');
+    }
+
+    final output = Uint8List(width * height * 3);
+    var outputIndex = 0;
+
+    for (var outputY = 0; outputY < height; outputY++) {
+      final dy = (outputY * rotatedHeight) ~/ height;
+
+      for (var outputX = 0; outputX < width; outputX++) {
+        final dx = (outputX * rotatedWidth) ~/ width;
+
+        final int sourceX;
+        final int sourceY;
+
+        switch (rotation) {
+          case 0:
+            sourceX = dx;
+            sourceY = dy;
+            break;
+          case 90:
+            sourceX = dy;
+            sourceY = frame.height - 1 - dx;
+            break;
+          case 180:
+            sourceX = frame.width - 1 - dx;
+            sourceY = frame.height - 1 - dy;
+            break;
+          case 270:
+            sourceX = frame.width - 1 - dy;
+            sourceY = dx;
+            break;
+          default:
+            throw ArgumentError('Unsupported frame rotation: $rotation.');
+        }
+
+        if (isBgra) {
+          final pixelIndex =
+              sourceY * yPlane.bytesPerRow + sourceX * yPlane.pixelStride;
+          output[outputIndex++] = yPlane.bytes[pixelIndex + 2];
+          output[outputIndex++] = yPlane.bytes[pixelIndex + 1];
+          output[outputIndex++] = yPlane.bytes[pixelIndex];
+          continue;
+        }
+
+        final yIndex =
+            sourceY * yPlane.bytesPerRow + sourceX * yPlane.pixelStride;
+        final uvX = sourceX >> 1;
+        final uvY = sourceY >> 1;
+        final uIndex = uvY * uPlane!.bytesPerRow + uvX * uPlane.pixelStride;
+        final uValue = uPlane.bytes[uIndex];
+        final vValue = interleavedUv
+            ? uPlane.bytes[uIndex + 1]
+            : vPlane!.bytes[uvY * vPlane.bytesPerRow +
+                  uvX * vPlane.pixelStride];
+
+        final c = yPlane.bytes[yIndex] - 16;
+        final d = uValue - 128;
+        final e = vValue - 128;
+
+        final red = (298 * c + 409 * e + 128) >> 8;
+        final green = (298 * c - 100 * d - 208 * e + 128) >> 8;
+        final blue = (298 * c + 516 * d + 128) >> 8;
+
+        output[outputIndex++] = red < 0
+            ? 0
+            : red > 255
+            ? 255
+            : red;
+        output[outputIndex++] = green < 0
+            ? 0
+            : green > 255
+            ? 255
+            : green;
+        output[outputIndex++] = blue < 0
+            ? 0
+            : blue > 255
+            ? 255
+            : blue;
       }
     }
 
-    return TflitePrediction(
-      value: labels[bestIndex],
-      confidence: bestProbability.clamp(0.0, 1.0),
-    );
+    return output;
   }
 
   Future<Interpreter> _ensureInterpreter() {
@@ -198,65 +301,6 @@ class TfliteService {
     }
 
     throw StateError('Unsupported model input type: $inputType.');
-  }
-
-  static Uint8List prepareInput(
-    img.Image source, {
-    required int width,
-    required int height,
-    bool cropToGuide = true,
-  }) {
-    if (width <= 0 || height <= 0 || width != height) {
-      throw ArgumentError('Model input dimensions must be equal and positive.');
-    }
-
-    final oriented = img.bakeOrientation(source);
-    final prepared = cropToGuide ? _cropToGuide(oriented) : oriented;
-    final resized = img.copyResize(
-      prepared,
-      width: width,
-      height: height,
-      interpolation: img.Interpolation.average,
-    );
-
-    return resized.getBytes(order: img.ChannelOrder.rgb);
-  }
-
-  static ({int x, int y, int width, int height}) guideCropRect(
-    int imageWidth,
-    int imageHeight,
-  ) {
-    if (imageWidth <= 0 || imageHeight <= 0) {
-      throw ArgumentError('Image dimensions must be positive.');
-    }
-
-    final cropWidth = math.max(
-      1,
-      math.min(imageWidth, (imageWidth * guideWidthFactor).round()),
-    );
-    final cropHeight = math.max(
-      1,
-      math.min(imageHeight, (cropWidth / 2).round()),
-    );
-    final centerY = (imageHeight * guideCenterYFactor).round();
-    final top = math.max(
-      0,
-      math.min(imageHeight - cropHeight, centerY - cropHeight ~/ 2),
-    );
-    final left = math.max(0, (imageWidth - cropWidth) ~/ 2);
-
-    return (x: left, y: top, width: cropWidth, height: cropHeight);
-  }
-
-  static img.Image _cropToGuide(img.Image source) {
-    final rect = guideCropRect(source.width, source.height);
-    return img.copyCrop(
-      source,
-      x: rect.x,
-      y: rect.y,
-      width: rect.width,
-      height: rect.height,
-    );
   }
 
   static List<double> normalizeScores(List<num> scores) {

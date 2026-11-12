@@ -37,13 +37,7 @@ class ScannerCameraPreview extends StatelessWidget {
           return Center(
             child: AspectRatio(
               aspectRatio: aspectRatio,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  camera.CameraPreview(controller),
-                  const IgnorePointer(child: _CameraGuide()),
-                ],
-              ),
+              child: camera.CameraPreview(controller),
             ),
           );
         },
@@ -118,53 +112,6 @@ class _CameraError extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _CameraGuide extends StatelessWidget {
-  const _CameraGuide();
-
-  @override
-  Widget build(BuildContext context) {
-    final guideColor = Theme.of(context).colorScheme.primary;
-
-    return Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              'Banknotu çerçeve içine yerleştirin',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const Spacer(),
-          FractionallySizedBox(
-            widthFactor: 0.95,
-            child: AspectRatio(
-              aspectRatio: 2,
-              child: Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: guideColor, width: 3),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-            ),
-          ),
-          const Spacer(flex: 2),
-        ],
       ),
     );
   }

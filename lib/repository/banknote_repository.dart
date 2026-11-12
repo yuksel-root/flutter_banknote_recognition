@@ -1,10 +1,10 @@
 import 'dart:convert';
 
-import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/banknote_result.dart';
+import '../models/video_frame.dart';
 import '../services/tflite_service.dart';
 
 class BanknoteRepository {
@@ -26,22 +26,18 @@ class BanknoteRepository {
 
   Future<Map<String, List<String>>>? _securityFeatures;
 
-  Future<BanknoteResult?> recognize(
-    XFile image, {
-    bool applyThreshold = true,
-  }) async {
-    final prediction = await _tfliteService.predict(image);
+  Future<LivePrediction> analyzeFrame(VideoFrame frame) {
+    return _tfliteService.predictFrame(frame);
+  }
 
-    if (applyThreshold && prediction.confidence < _confidenceThreshold) {
-      return null;
-    }
-
+  Future<BanknoteResult> createResult(LivePrediction prediction) async {
     final securityFeatures = await _loadSecurityFeatures();
-    final features = securityFeatures[prediction.value] ?? const <String>[];
+    final best = prediction.best;
+    final features = securityFeatures[best.value] ?? const <String>[];
 
     return BanknoteResult(
-      value: prediction.value,
-      confidence: prediction.confidence,
+      value: best.value,
+      confidence: best.confidence,
       securityFeatures: List<String>.unmodifiable(features),
     );
   }

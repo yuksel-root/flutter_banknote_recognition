@@ -1,104 +1,140 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../models/banknote_result.dart';
 import '../repository/banknote_repository.dart';
+import '../services/camera_service.dart';
+import '../services/tflite_service.dart';
 import 'scanner_event.dart';
 import 'scanner_state.dart';
+import 'stable_frame_tracker.dart';
 
 class ScannerBloc extends Bloc<ScannerEvent, ScannerState> {
-  ScannerBloc({required BanknoteRepository repository})
-    : _repository = repository,
-      super(const ScannerIdle()) {
-    on<ScanRequested>(_onScanRequested);
+  ScannerBloc({
+    required BanknoteRepository repository,
+    required ScannerFrameSource frameSource,
+  }) : _repository = repository,
+       _frameSource = frameSource,
+       super(const ScannerIdle()) {
+    on<ScanStarted>(_onScanStarted);
     on<ScanReset>(_onScanReset);
   }
 
-  static const int minimumStableFrames = 2;
+  static const int stableFrameCount = 3;
+  static const int maximumConsecutiveFailures = 10;
 
   final BanknoteRepository _repository;
+  final ScannerFrameSource _frameSource;
 
-  Future<void> _onScanRequested(
-    ScanRequested event,
+  Future<void> _onScanStarted(
+    ScanStarted event,
     Emitter<ScannerState> emit,
   ) async {
-    if (state is ScannerProcessing) {
+    if (state is! ScannerIdle) {
       return;
     }
 
-    emit(const ScannerProcessing());
+    if (!_frameSource.isReady) {
+      emit(
+        const ScannerError(
+          'Kamera hazır değil. Lütfen kamerayı yeniden başlatın.',
+        ),
+      );
+      return;
+    }
 
-    final results = <BanknoteResult>[];
-    var hadError = false;
+    final tracker = StableFrameTracker(
+      requiredFrames: stableFrameCount,
+      minimumConfidence: _repository.confidenceThreshold,
+    );
 
-    for (final image in event.images) {
-      try {
-        final result = await _repository.recognize(
-          image,
-          applyThreshold: false,
-        );
-        if (result != null) {
-          results.add(result);
+    emit(
+      ScannerScanning(
+        ranked: const <RankedPrediction>[],
+        elapsed: Duration.zero,
+        matchedFrames: 0,
+      ),
+    );
+
+    var consecutiveFailures = 0;
+
+    try {
+      await _frameSource.startImageStream();
+
+      while (!emit.isDone && state is ScannerScanning) {
+        final frame = await _frameSource.nextFrame();
+        if (emit.isDone || state is! ScannerScanning) {
+          break;
         }
-      } catch (_) {
-        hadError = true;
-      }
 
-      if (emit.isDone || state is! ScannerProcessing) {
-        return;
-      }
-    }
+        if (frame == null) {
+          emit(
+            const ScannerError(
+              'Kamera görüntüsü alınamadı. Lütfen tekrar deneyin.',
+            ),
+          );
+          break;
+        }
 
-    if (results.isEmpty) {
-      emit(
-        ScannerError(
-          hadError
-              ? 'Banknot incelenirken bir hata oluştu. Lütfen tekrar deneyin.'
-              : 'Banknot okunamadı. Lütfen banknotu düz bir zemine koyup tekrar deneyin.',
-        ),
-      );
-      return;
-    }
+        final LivePrediction prediction;
+        try {
+          prediction = await _repository.analyzeFrame(frame);
+          consecutiveFailures = 0;
+        } catch (_) {
+          consecutiveFailures += 1;
+          if (consecutiveFailures >= maximumConsecutiveFailures) {
+            emit(
+              const ScannerError(
+                'Banknot incelenirken bir hata oluştu. Lütfen tekrar deneyin.',
+              ),
+            );
+            break;
+          }
+          continue;
+        }
 
-    final counts = <String, int>{};
-    for (final result in results) {
-      counts[result.value] = (counts[result.value] ?? 0) + 1;
-    }
+        final stable = tracker.add(prediction);
+        if (emit.isDone || state is! ScannerScanning) {
+          break;
+        }
 
-    String? stableValue;
-    var stableCount = 0;
-    for (final entry in counts.entries) {
-      if (entry.value > stableCount) {
-        stableValue = entry.key;
-        stableCount = entry.value;
-      }
-    }
-
-    if (stableCount < minimumStableFrames ||
-        results.length < minimumStableFrames) {
-      emit(
-        const ScannerError(
-          'Banknot yeterince net okunamadı. Lütfen banknotu sabit tutup tekrar deneyin.',
-        ),
-      );
-      return;
-    }
-
-    final stableResult = results
-        .where((result) => result.value == stableValue)
-        .reduce(
-          (best, result) => result.confidence > best.confidence ? result : best,
+        emit(
+          ScannerScanning(
+            ranked: prediction.ranked,
+            elapsed: prediction.elapsed,
+            matchedFrames: tracker.matchedFrames,
+          ),
         );
 
-    if (stableResult.confidence < _repository.confidenceThreshold) {
-      emit(
-        const ScannerError(
-          'Banknot yeterince net okunamadı. Lütfen banknotu sabit tutup tekrar deneyin.',
-        ),
-      );
-      return;
-    }
+        if (stable == null) {
+          continue;
+        }
 
-    emit(ScannerResult(stableResult));
+        final result = await _repository.createResult(stable);
+        if (emit.isDone || state is! ScannerScanning) {
+          break;
+        }
+
+        emit(
+          ScannerResult(
+            result: result,
+            ranked: stable.ranked,
+            elapsed: stable.elapsed,
+          ),
+        );
+        break;
+      }
+    } catch (_) {
+      if (!emit.isDone && state is ScannerScanning) {
+        emit(
+          const ScannerError(
+            'Kamera görüntüsü başlatılamadı. Lütfen tekrar deneyin.',
+          ),
+        );
+      }
+    } finally {
+      try {
+        await _frameSource.stopImageStream();
+      } catch (_) {}
+    }
   }
 
   void _onScanReset(ScanReset event, Emitter<ScannerState> emit) {

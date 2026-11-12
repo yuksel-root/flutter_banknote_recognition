@@ -21,6 +21,7 @@ void main() {
     final ttsService = TtsService();
     final scannerBloc = ScannerBloc(
       repository: _FakeBanknoteRepository(preferences),
+      frameSource: cameraService,
     );
 
     addTearDown(() async {
@@ -43,13 +44,13 @@ void main() {
     await tester.pump();
 
     expect(find.text('Banknot Tanıma'), findsOneWidget);
-    expect(find.text('Banknotu hazırlayın'), findsOneWidget);
+    expect(find.text('Banknotu kameraya gösterin'), findsOneWidget);
     expect(find.text('Kamera başlatılıyor...'), findsOneWidget);
-    expect(find.text('Tara'), findsOneWidget);
+    expect(find.text('Taramayı Başlat'), findsOneWidget);
     expect(find.text('Türkçe seslendirme kullanılamıyor.'), findsOneWidget);
 
     final scanButton = tester.widget<ElevatedButton>(
-      find.widgetWithText(ElevatedButton, 'Tara'),
+      find.widgetWithText(ElevatedButton, 'Taramayı Başlat'),
     );
     expect(scanButton.onPressed, isNull);
   });

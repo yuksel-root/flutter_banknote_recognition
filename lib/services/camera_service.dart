@@ -2,7 +2,10 @@ import 'dart:async';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show DeviceOrientation;
 import 'package:flutter/widgets.dart';
+
+import '../models/video_frame.dart';
 
 class CameraServiceState {
   const CameraServiceState({
@@ -18,10 +21,24 @@ class CameraServiceState {
   bool get isReady => controller?.value.isInitialized ?? false;
 }
 
-class CameraService {
+abstract interface class ScannerFrameSource {
+  bool get isReady;
+
+  int get frameRotationDegrees;
+
+  Future<void> startImageStream();
+
+  Future<VideoFrame?> nextFrame();
+
+  Future<void> stopImageStream();
+}
+
+class CameraService implements ScannerFrameSource {
   CameraService() {
     WidgetsBinding.instance.addObserver(_lifecycleObserver);
   }
+
+  static const Duration frameInterval = Duration(milliseconds: 200);
 
   final ValueNotifier<CameraServiceState> _state = ValueNotifier(
     const CameraServiceState(),
@@ -37,11 +54,39 @@ class CameraService {
   bool _isInitializing = false;
   bool _disposed = false;
   String? _errorMessage;
+  Timer? _frameTimer;
+  CameraImage? _latestImage;
+  Completer<VideoFrame?>? _pendingFrame;
+  bool _streaming = false;
 
   CameraController? get controller => _controller;
   bool get isInitializing => _isInitializing;
+  @override
   bool get isReady => _controller?.value.isInitialized ?? false;
   String? get errorMessage => _errorMessage;
+
+  @override
+  int get frameRotationDegrees {
+    final activeController = _controller;
+    if (activeController == null || !activeController.value.isInitialized) {
+      return 0;
+    }
+
+    final deviceDegrees = switch (activeController.value.deviceOrientation) {
+      DeviceOrientation.portraitUp => 0,
+      DeviceOrientation.landscapeLeft => 90,
+      DeviceOrientation.portraitDown => 180,
+      DeviceOrientation.landscapeRight => 270,
+    };
+    final sensorDegrees = activeController.description.sensorOrientation;
+
+    if (activeController.description.lensDirection ==
+        CameraLensDirection.front) {
+      return (sensorDegrees + deviceDegrees) % 360;
+    }
+
+    return (sensorDegrees - deviceDegrees + 360) % 360;
+  }
 
   Future<void> initialize() {
     if (_disposed) {
@@ -83,6 +128,7 @@ class CameraService {
         camera,
         ResolutionPreset.high,
         enableAudio: false,
+        imageFormatGroup: ImageFormatGroup.yuv420,
       );
       await newController.initialize();
 
@@ -106,51 +152,118 @@ class CameraService {
     }
   }
 
-  Future<XFile?> takePicture() async {
+  @override
+  Future<void> startImageStream() async {
     final activeController = _controller;
     if (activeController == null || !activeController.value.isInitialized) {
       _errorMessage = 'Kamera hazır değil. Lütfen kamerayı yeniden başlatın.';
       _publish();
-      return null;
+      throw StateError('Camera is not ready.');
     }
 
-    if (activeController.value.isTakingPicture) {
-      return null;
+    if (_streaming) {
+      return;
     }
+
+    _streaming = true;
+    _latestImage = null;
 
     try {
-      return await activeController.takePicture();
-    } on CameraException catch (error) {
-      _errorMessage = _cameraErrorMessage(error);
+      await activeController.startImageStream(_onImageAvailable);
+      _frameTimer = Timer.periodic(frameInterval, _onFrameTick);
     } catch (_) {
-      _errorMessage = 'Fotoğraf çekilemedi. Lütfen tekrar deneyin.';
+      _streaming = false;
+      rethrow;
     }
-
-    _publish();
-    return null;
   }
 
-  Future<List<XFile>> takePictureBurst({
-    int count = 3,
-    Duration interval = const Duration(milliseconds: 250),
-  }) async {
-    if (count <= 0) {
-      return const <XFile>[];
+  @override
+  Future<VideoFrame?> nextFrame() {
+    if (!_streaming) {
+      return Future<VideoFrame?>.value();
     }
 
-    final images = <XFile>[];
-
-    for (var index = 0; index < count; index++) {
-      final image = await takePicture();
-      if (image != null) {
-        images.add(image);
-      }
-      if (index < count - 1) {
-        await Future<void>.delayed(interval);
-      }
+    final existing = _pendingFrame;
+    if (existing != null) {
+      return existing.future;
     }
 
-    return images;
+    final completer = Completer<VideoFrame?>();
+    _pendingFrame = completer;
+    return completer.future;
+  }
+
+  @override
+  Future<void> stopImageStream() async {
+    _frameTimer?.cancel();
+    _frameTimer = null;
+    _latestImage = null;
+
+    final pending = _pendingFrame;
+    _pendingFrame = null;
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(null);
+    }
+
+    final activeController = _controller;
+    if (!_streaming) {
+      return;
+    }
+
+    _streaming = false;
+    if (activeController != null && activeController.value.isStreamingImages) {
+      try {
+        await activeController.stopImageStream();
+      } on CameraException {
+        _errorMessage = 'Kamera görüntüsü durdurulamadı.';
+      }
+    }
+  }
+
+  void _onImageAvailable(CameraImage image) {
+    if (!_streaming) {
+      return;
+    }
+    _latestImage = image;
+  }
+
+  void _onFrameTick(Timer timer) {
+    final image = _latestImage;
+    final pending = _pendingFrame;
+    if (image == null || pending == null || pending.isCompleted) {
+      return;
+    }
+
+    _latestImage = null;
+    _pendingFrame = null;
+
+    try {
+      pending.complete(_toVideoFrame(image));
+    } catch (_) {
+      pending.complete(null);
+    }
+  }
+
+  VideoFrame _toVideoFrame(CameraImage image) {
+    final format = image.format.group == ImageFormatGroup.bgra8888
+        ? FrameFormat.bgra8888
+        : FrameFormat.yuv420;
+
+    return VideoFrame(
+      width: image.width,
+      height: image.height,
+      planes: image.planes
+          .map(
+            (plane) => FramePlane(
+              bytes: plane.bytes,
+              bytesPerRow: plane.bytesPerRow,
+              pixelStride: plane.bytesPerPixel ?? 1,
+            ),
+          )
+          .toList(growable: false),
+      format: format,
+      rotationDegrees: frameRotationDegrees,
+    );
   }
 
   Future<void> retry() async {
@@ -169,6 +282,7 @@ class CameraService {
   }
 
   Future<void> _disposeCurrentController() async {
+    await stopImageStream();
     final previousController = _controller;
     _controller = null;
     _publish();
@@ -204,8 +318,18 @@ class CameraService {
   void dispose() {
     _disposed = true;
     WidgetsBinding.instance.removeObserver(_lifecycleObserver);
+    _frameTimer?.cancel();
+    _frameTimer = null;
+
+    final pending = _pendingFrame;
+    _pendingFrame = null;
+    if (pending != null && !pending.isCompleted) {
+      pending.complete(null);
+    }
+
     final activeController = _controller;
     _controller = null;
+    _streaming = false;
     if (activeController != null) {
       unawaited(activeController.dispose());
     }

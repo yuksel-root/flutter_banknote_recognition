@@ -28,7 +28,10 @@ Future<void> main() async {
         RepositoryProvider<BanknoteRepository>.value(value: banknoteRepository),
       ],
       child: BlocProvider(
-        create: (_) => ScannerBloc(repository: banknoteRepository),
+        create: (_) => ScannerBloc(
+          repository: banknoteRepository,
+          frameSource: cameraService,
+        ),
         child: const BanknoteApp(),
       ),
     ),
