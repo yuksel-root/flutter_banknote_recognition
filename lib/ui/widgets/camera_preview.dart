@@ -28,12 +28,23 @@ class ScannerCameraPreview extends StatelessWidget {
             return const _CameraLoading();
           }
 
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              Center(child: camera.CameraPreview(controller)),
-              const IgnorePointer(child: _CameraGuide()),
-            ],
+          final isLandscape =
+              MediaQuery.of(context).orientation == Orientation.landscape;
+          final aspectRatio = isLandscape
+              ? controller.value.aspectRatio
+              : 1 / controller.value.aspectRatio;
+
+          return Center(
+            child: AspectRatio(
+              aspectRatio: aspectRatio,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  camera.CameraPreview(controller),
+                  const IgnorePointer(child: _CameraGuide()),
+                ],
+              ),
+            ),
           );
         },
       ),

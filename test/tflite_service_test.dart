@@ -16,7 +16,12 @@ void main() {
         }
       }
 
-      final bytes = TfliteService.prepareInput(source, width: 224, height: 224);
+      final bytes = TfliteService.prepareInput(
+        source,
+        width: 224,
+        height: 224,
+        cropToGuide: false,
+      );
 
       expect(bytes.length, 224 * 224 * 3);
 
@@ -41,6 +46,59 @@ void main() {
         () => TfliteService.prepareInput(source, width: 224, height: 112),
         throwsArgumentError,
       );
+    });
+
+    test('crops the guide area before resizing', () {
+      final source = img.Image(width: 400, height: 400);
+      for (var y = 0; y < source.height; y++) {
+        for (var x = 0; x < source.width; x++) {
+          final inside = x >= 10 && x < 390 && y >= 85 && y < 275;
+          source.setPixelRgb(x, y, inside ? 0 : 255, inside ? 255 : 0, 0);
+        }
+      }
+
+      final bytes = TfliteService.prepareInput(source, width: 224, height: 224);
+
+      expect(bytes.sublist(0, 3), [0, 255, 0]);
+      final last = (224 * 224 - 1) * 3;
+      expect(bytes.sublist(last, last + 3), [0, 255, 0]);
+    });
+
+    test('computes a wide guide crop around the note area', () {
+      expect(TfliteService.guideCropRect(720, 1280), (
+        x: 18,
+        y: 405,
+        width: 684,
+        height: 342,
+      ));
+      expect(TfliteService.guideCropRect(1280, 720), (
+        x: 32,
+        y: 20,
+        width: 1216,
+        height: 608,
+      ));
+      expect(() => TfliteService.guideCropRect(0, 720), throwsArgumentError);
+    });
+  });
+
+  group('combinePredictions', () {
+    test('keeps the higher confidence when both crops agree', () {
+      final combined = TfliteService.combinePredictions(
+        const TflitePrediction(value: '100 TL', confidence: 0.8),
+        const TflitePrediction(value: '100 TL', confidence: 0.6),
+      );
+
+      expect(combined.value, '100 TL');
+      expect(combined.confidence, 0.8);
+    });
+
+    test('returns zero confidence when the crops disagree', () {
+      final combined = TfliteService.combinePredictions(
+        const TflitePrediction(value: '100 TL', confidence: 0.8),
+        const TflitePrediction(value: '50 TL', confidence: 0.7),
+      );
+
+      expect(combined.confidence, 0);
     });
   });
 

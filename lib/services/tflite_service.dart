@@ -22,6 +22,8 @@ class TfliteService {
     '100 TL',
     '200 TL',
   ];
+  static const double guideWidthFactor = 0.95;
+  static const double guideCenterYFactor = 0.45;
 
   Interpreter? _interpreter;
   Future<Interpreter>? _loadingInterpreter;
@@ -45,14 +47,43 @@ class TfliteService {
       throw const FormatException('The captured image could not be decoded.');
     }
 
-    final rgbBytes = prepareInput(
+    final fullFrameBytes = prepareInput(
+      decodedImage,
+      width: _inputWidth,
+      height: _inputHeight,
+      cropToGuide: false,
+    );
+    final guideBytes = prepareInput(
       decodedImage,
       width: _inputWidth,
       height: _inputHeight,
     );
 
-    final output = _runInference(interpreter, rgbBytes);
-    final probabilities = normalizeScores(output);
+    final fullFramePrediction = _predictionFromScores(
+      normalizeScores(_runInference(interpreter, fullFrameBytes)),
+    );
+    final guidePrediction = _predictionFromScores(
+      normalizeScores(_runInference(interpreter, guideBytes)),
+    );
+
+    return combinePredictions(fullFramePrediction, guidePrediction);
+  }
+
+  static TflitePrediction combinePredictions(
+    TflitePrediction fullFrame,
+    TflitePrediction guideCrop,
+  ) {
+    if (fullFrame.value != guideCrop.value) {
+      return TflitePrediction(value: fullFrame.value, confidence: 0);
+    }
+
+    return TflitePrediction(
+      value: fullFrame.value,
+      confidence: math.max(fullFrame.confidence, guideCrop.confidence),
+    );
+  }
+
+  static TflitePrediction _predictionFromScores(List<double> probabilities) {
     var bestIndex = 0;
     var bestProbability = probabilities.first;
 
@@ -173,20 +204,59 @@ class TfliteService {
     img.Image source, {
     required int width,
     required int height,
+    bool cropToGuide = true,
   }) {
     if (width <= 0 || height <= 0 || width != height) {
       throw ArgumentError('Model input dimensions must be equal and positive.');
     }
 
     final oriented = img.bakeOrientation(source);
+    final prepared = cropToGuide ? _cropToGuide(oriented) : oriented;
     final resized = img.copyResize(
-      oriented,
+      prepared,
       width: width,
       height: height,
       interpolation: img.Interpolation.average,
     );
 
     return resized.getBytes(order: img.ChannelOrder.rgb);
+  }
+
+  static ({int x, int y, int width, int height}) guideCropRect(
+    int imageWidth,
+    int imageHeight,
+  ) {
+    if (imageWidth <= 0 || imageHeight <= 0) {
+      throw ArgumentError('Image dimensions must be positive.');
+    }
+
+    final cropWidth = math.max(
+      1,
+      math.min(imageWidth, (imageWidth * guideWidthFactor).round()),
+    );
+    final cropHeight = math.max(
+      1,
+      math.min(imageHeight, (cropWidth / 2).round()),
+    );
+    final centerY = (imageHeight * guideCenterYFactor).round();
+    final top = math.max(
+      0,
+      math.min(imageHeight - cropHeight, centerY - cropHeight ~/ 2),
+    );
+    final left = math.max(0, (imageWidth - cropWidth) ~/ 2);
+
+    return (x: left, y: top, width: cropWidth, height: cropHeight);
+  }
+
+  static img.Image _cropToGuide(img.Image source) {
+    final rect = guideCropRect(source.width, source.height);
+    return img.copyCrop(
+      source,
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+    );
   }
 
   static List<double> normalizeScores(List<num> scores) {
