@@ -23,14 +23,7 @@ class LivePrediction {
 
 class TfliteService {
   static const String modelAsset = 'assets/model.tflite';
-  static const List<String> labels = [
-    '5 TL',
-    '10 TL',
-    '20 TL',
-    '50 TL',
-    '100 TL',
-    '200 TL',
-  ];
+  static const List<String> labels = ['5', '10', '20', '50', '100', '200'];
   static const int topPredictionCount = 5;
 
   Interpreter? _interpreter;
@@ -76,7 +69,7 @@ class TfliteService {
           .take(topPredictionCount)
           .map(
             (index) => RankedPrediction(
-              value: labels[index],
+              value: "${labels[index]} TL",
               confidence: probabilities[index].clamp(0.0, 1.0),
             ),
           ),
@@ -286,7 +279,7 @@ class TfliteService {
     if (inputType == TensorType.float32) {
       final input = Float32List(rgbBytes.length);
       for (var index = 0; index < rgbBytes.length; index++) {
-        input[index] = rgbBytes[index] / 255.0;
+        input[index] = rgbBytes[index].toDouble();
       }
 
       if (outputType == TensorType.uint8) {

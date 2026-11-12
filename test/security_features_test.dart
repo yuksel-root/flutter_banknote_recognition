@@ -10,12 +10,13 @@ void main() {
     final decoded = jsonDecode(rawJson) as Map<String, dynamic>;
 
     for (final label in TfliteService.labels) {
-      final features = decoded[label];
-      expect(features, isA<List<dynamic>>(), reason: '$label is missing');
+      final value = '$label TL';
+      final features = decoded[value];
+      expect(features, isA<List<dynamic>>(), reason: '$value is missing');
       expect(
         (features as List<dynamic>),
         isNotEmpty,
-        reason: '$label is empty',
+        reason: '$value is empty',
       );
       expect(features.every((feature) => feature is String), isTrue);
     }
